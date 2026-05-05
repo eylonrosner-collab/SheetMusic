@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scrolling</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0f0f11}
+body{font-family:'DM Mono',monospace;color:#e8e4dc;height:100vh;display:flex;flex-direction:column;font-size:10px}
+
+/* ── TOP BAR ── */
+#topbar{display:flex;align-items:center;gap:.45rem;padding:.42rem .85rem;background:#161618;border-bottom:1px solid #252528;flex-shrink:0;flex-wrap:wrap}
+.logo{font-family:Georgia,serif;font-size:1rem;color:#c8a96e;white-space:nowrap}
+.sep{width:1px;height:16px;background:#2a2a2e;flex-shrink:0}
+.upbtn{position:relative;display:inline-flex}
+.upbtn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.uplbl,.btn{display:inline-flex;align-items:center;padding:.2rem .55rem;border:1px solid #2a2a2e;border-radius:3px;font-size:.68rem;text-transform:uppercase;cursor:pointer;white-space:nowrap;font-family:'DM Mono',monospace;background:transparent;transition:all .15s;letter-spacing:.04em;color:#e8e4dc}
+.uplbl{border-color:#c8a96e;color:#c8a96e;pointer-events:none}
+.upbtn:hover .uplbl{background:rgba(200,169,110,.1)}
+.btn:hover:not(:disabled){border-color:#7eb8c9;color:#7eb8c9}
+.btn.play{border-color:#c8a96e;color:#c8a96e;background:rgba(200,169,110,.08)}
+.btn.pause{border-color:#c96e6e;color:#c96e6e;background:rgba(201,110,110,.08)}
+.btn.stp{border-color:#444;color:#555}.btn.stp:hover:not(:disabled){border-color:#c96e6e;color:#c96e6e}
+.btn.ana{border-color:#6ec88a;color:#6ec88a}.btn.ana:hover:not(:disabled){background:rgba(110,200,138,.08)}
+.btn.man{border-color:#7eb8c9;color:#7eb8c9}.btn.man:hover:not(:disabled){background:rgba(126,184,201,.08)}
+.btn.man.active{background:rgba(126,184,201,.12)}
+.btn.sav{border-color:#888;color:#888}.btn.sav:hover:not(:disabled){border-color:#c8a96e;color:#c8a96e}
+.btn.cfg{border-color:#666;color:#888;font-size:.9rem;padding:.18rem .45rem}.btn.cfg:hover:not(:disabled){border-color:#c8a96e;color:#c8a96e}
+.btn:disabled{border-color:#222;color:#333;cursor:default;pointer-events:none}
+.tgrp{display:flex;align-items:center;gap:.35rem}
+.tlbl{font-size:.56rem;color:#555;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+.bpmw{display:flex;flex-direction:column;align-items:center}
+#bpmVal{width:2.6rem;background:transparent;border:none;border-bottom:1px solid #c8a96e;color:#c8a96e;font-family:Georgia,serif;font-size:1.1rem;text-align:center;outline:none;-moz-appearance:textfield}
+#bpmVal::-webkit-outer-spin-button,#bpmVal::-webkit-inner-spin-button{-webkit-appearance:none}
+.bpmu{font-size:.44rem;color:#555;text-transform:uppercase}
+.rng{-webkit-appearance:none;width:80px;height:3px;background:#2a2a2e;border-radius:2px;outline:none;cursor:pointer}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:#c8a96e;cursor:pointer}
+#pgLbl{font-size:.56rem;color:#555;white-space:nowrap}
+
+/* Now playing — larger, right side */
+#nowBlock{display:flex;flex-direction:column;align-items:flex-end;gap:.1rem;margin-left:auto}
+#nowTxt{font-size:.85rem;color:#c8a96e;white-space:nowrap;letter-spacing:.05em;font-weight:700;font-family:Georgia,serif}
+#seqTxt{font-size:.6rem;white-space:nowrap;letter-spacing:.04em;color:#555}
+#seqTxt .sq-done{color:#2a2a2e}
+#seqTxt .sq-now{color:#c8a96e;font-weight:700}
+#seqTxt .sq-nxt{color:#7eb8c9}
+#seqTxt .sq-rest{color:#444}
+#seqTxt .sq-arrow{color:#2a2a2e;margin:0 .1rem}
+
+/* ── MANUAL ORDER ROW ── */
+#orderRow{display:none;align-items:center;gap:.4rem;padding:.3rem .85rem;background:#111315;border-bottom:1px solid #1e2023;flex-shrink:0;flex-wrap:wrap}
+#orderRow.visible{display:flex}
+#orderRow label{font-size:.6rem;color:#888;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+#orderInput{background:#0f0f11;border:1px solid #2a2a2e;border-radius:3px;color:#e8e4dc;font-family:'DM Mono',monospace;font-size:.7rem;padding:.2rem .5rem;outline:none;width:170px}
+#orderInput:focus{border-color:#c8a96e}
+
+/* ── VIEWER ── */
+#viewWrap{flex:1;min-height:0;position:relative;overflow:hidden;background:#f2f2ed}
+#pdfCanvas{display:block;position:absolute;top:0;left:0}
+#rollBar{position:absolute;left:0;right:0;height:3px;background:rgba(200,169,110,.8);pointer-events:none;z-index:10;display:none;box-shadow:0 0 8px rgba(200,169,110,.6)}
+#progBar{position:absolute;bottom:0;left:0;height:2px;background:linear-gradient(90deg,#c8a96e,#7eb8c9);z-index:8;width:0}
+
+/* Section start markers */
+.sec-marker{position:absolute;left:0;right:0;height:30px;z-index:6;cursor:ns-resize;touch-action:none;user-select:none}
+.sec-line{position:absolute;top:50%;left:0;right:50px;height:2px;background:rgba(200,169,110,.45);transform:translateY(-50%)}
+.sec-marker:hover .sec-line,.sec-marker.dragging .sec-line{background:rgba(200,169,110,.9)}
+.sec-dot{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;background:#c8a96e;color:#1a1200;font-family:Georgia,serif;font-size:.78rem;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:all;cursor:pointer}
+.sec-dot.active{background:#6ec88a;box-shadow:0 0 10px rgba(110,200,138,.55)}
+.sec-drag-hint{position:absolute;right:44px;top:50%;transform:translateY(-50%);font-size:.5rem;color:rgba(200,169,110,.65);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;text-transform:uppercase;letter-spacing:.05em}
+.sec-marker:hover .sec-drag-hint{opacity:1}
+
+/* Section END markers */
+.end-marker{position:absolute;left:0;right:0;height:30px;z-index:6;cursor:ns-resize;touch-action:none;user-select:none}
+.end-line{position:absolute;top:50%;left:0;right:50px;height:2px;background:rgba(201,110,110,.45);transform:translateY(-50%);border-top:1px dashed rgba(201,110,110,.4)}
+.end-marker:hover .end-line,.end-marker.dragging .end-line{background:rgba(201,110,110,.9)}
+.end-dot{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:3px;background:#c96e6e;color:#fff;font-family:'DM Mono',monospace;font-size:.42rem;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:all;cursor:pointer;text-transform:uppercase}
+.end-drag-hint{position:absolute;right:44px;top:50%;transform:translateY(-50%);font-size:.5rem;color:rgba(201,110,110,.65);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;text-transform:uppercase;letter-spacing:.05em}
+.end-marker:hover .end-drag-hint{opacity:1}
+
+/* ── FLOATING NEXT SECTION BUTTON ── */
+#btnNext{position:fixed;bottom:28px;right:28px;width:64px;height:64px;border-radius:50%;background:#c8a96e;color:#1a1200;font-size:1.6rem;border:none;cursor:pointer;z-index:30;box-shadow:0 4px 20px rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;transition:transform .1s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#btnNext:active{transform:scale(.9);background:#b8996e}
+#btnNext.visible{display:flex}
+
+/* ── SETTINGS POPUP ── */
+#settingsOverlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;display:none;align-items:center;justify-content:center}
+#settingsOverlay.open{display:flex}
+#settingsPanel{background:#161618;border:1px solid #2a2a2e;border-radius:10px;padding:1.4rem 1.6rem;min-width:320px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,.7)}
+#settingsPanel h3{font-family:Georgia,serif;font-size:1.05rem;color:#c8a96e;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.85rem}
+.srow:last-child{margin-bottom:0}
+.slbl{font-size:.65rem;color:#888;text-transform:uppercase;letter-spacing:.08em;flex:1}
+.sdesc{font-size:.56rem;color:#555;margin-top:.15rem}
+.sinp{background:#0f0f11;border:1px solid #2a2a2e;border-radius:3px;color:#c8a96e;font-family:'DM Mono',monospace;font-size:.8rem;padding:.22rem .4rem;outline:none;width:4rem;text-align:center;-moz-appearance:textfield}
+.sinp::-webkit-outer-spin-button,.sinp::-webkit-inner-spin-button{-webkit-appearance:none}
+.sinp:focus{border-color:#c8a96e}
+.sclose{display:flex;justify-content:flex-end;margin-top:1.1rem}
+.sdivider{height:1px;background:#1e2023;margin:.6rem 0}
+
+/* Drop / loader */
+#drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;background:#0f0f11;z-index:20;transition:opacity .25s}
+#drop.gone{opacity:0;pointer-events:none}
+.dico{width:62px;height:62px;border:2px solid #252528;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1.8rem}
+.dtxt{font-family:Georgia,serif;font-size:1.35rem}
+.dsub{font-size:.68rem;color:#555;letter-spacing:.08em;text-transform:uppercase}
+#loader{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:.9rem;background:rgba(15,15,17,.94);z-index:21}
+.spin{width:30px;height:30px;border:2px solid #252528;border-top-color:#c8a96e;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.smsg{font-size:.65rem;color:#555;letter-spacing:.1em;text-transform:uppercase;text-align:center;max-width:220px;line-height:1.9;white-space:pre-line}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">♩ Scrolling</div>
+  <div class="sep"></div>
+
+  <div class="upbtn">
+    <input type="file" id="fileIn" accept=".pdf">
+    <div class="uplbl">📄 Open PDF</div>
+  </div>
+  <div class="sep"></div>
+
+  <button class="btn ana" id="btnAna" disabled>⬡ AI Analyze</button>
+  <button class="btn man" id="btnMan" disabled>✎ Manual</button>
+  <div class="sep"></div>
+
+  <!-- Tempo -->
+  <div class="tgrp">
+    <span class="tlbl">Tempo</span>
+    <div class="bpmw">
+      <input type="number" id="bpmVal" min="10" max="200" value="60">
+      <div class="bpmu">BPM</div>
+    </div>
+    <input class="rng" type="range" id="bpmRange" min="10" max="200" value="60" step="1">
+    <button class="btn" id="btnM5">−5</button>
+    <button class="btn" id="btnP5">+5</button>
+  </div>
+  <div class="sep"></div>
+
+  <button class="btn play" id="btnPlay" disabled>▶ Play</button>
+  <button class="btn stp"  id="btnStop" disabled>■ Stop</button>
+  <div class="sep"></div>
+
+  <button class="btn sav" id="btnSave" disabled>💾 Save PDF</button>
+  <div class="sep"></div>
+
+  <!-- Settings gear -->
+  <button class="btn cfg" id="btnCfg" title="Settings">⚙</button>
+  <div class="sep"></div>
+
+  <span id="pgLbl">— / —</span>
+
+  <!-- Now playing — right side, larger -->
+  <div id="nowBlock">
+    <span id="nowTxt"></span>
+    <span id="seqTxt"></span>
+  </div>
+</div>
+
+<!-- MANUAL ORDER ROW -->
+<div id="orderRow">
+  <label>Play order:</label>
+  <input type="text" id="orderInput" placeholder="e.g. A, A, B, B, A, C, C">
+  <button class="btn man" id="btnMarkSec">+ Section Start</button>
+  <button class="btn" id="btnMarkEnd" style="border-color:#c96e6e;color:#c96e6e">+ Section End</button>
+  <button class="btn play" id="btnOrderOk">✓ Apply</button>
+  <button class="btn stp"  id="btnOrderCancel">Cancel</button>
+</div>
+
+<!-- VIEWER -->
+<div id="viewWrap">
+  <canvas id="pdfCanvas"></canvas>
+  <div id="rollBar"></div>
+  <div id="progBar"></div>
+  <div id="drop">
+    <div class="dico">🎼</div>
+    <div class="dtxt">Drop your music score here</div>
+    <div class="dsub">or use the Open PDF button above</div>
+  </div>
+  <div id="loader">
+    <div class="spin"></div>
+    <div class="smsg" id="loaderMsg">Loading…</div>
+  </div>
+</div>
+
+<!-- FLOATING NEXT SECTION BUTTON -->
+<button id="btnNext" title="Next section (Space)">⏭</button>
+
+<!-- SETTINGS OVERLAY -->
+<div id="settingsOverlay">
+  <div id="settingsPanel">
+    <h3>⚙ Settings</h3>
+
+    <div class="srow">
+      <div>
+        <div class="slbl">Scroll Trigger %</div>
+        <div class="sdesc">Bar reaches this % of screen height → auto-scroll fires</div>
+      </div>
+      <input type="number" class="sinp" id="cfgTrig" min="30" max="99" value="65">
+    </div>
+
+    <div class="srow">
+      <div>
+        <div class="slbl">Scroll Speed (px/frame)</div>
+        <div class="sdesc">Higher = faster scroll animation</div>
+      </div>
+      <input type="number" class="sinp" id="cfgSpeed" min="1" max="60" value="50">
+    </div>
+
+    <div class="sdivider"></div>
+
+    <div class="srow">
+      <div>
+        <div class="slbl">Bar Landing Position %</div>
+        <div class="sdesc">After auto-scroll, bar lands at this % from top<br>
+          (e.g. 15% keeps chord symbols visible above staff)</div>
+      </div>
+      <input type="number" class="sinp" id="cfgLand" min="0" max="40" value="15">
+    </div>
+
+    <div class="sdivider"></div>
+
+    <div class="srow">
+      <div>
+        <div class="slbl">Gemini API Key</div>
+        <div class="sdesc">Used for AI section analysis</div>
+      </div>
+      <input type="text" class="sinp" id="cfgApiKey" style="width:200px;font-size:.58rem;letter-spacing:.02em" placeholder="AIza…">
+    </div>
+
+    <div class="sclose">
+      <button class="btn play" id="btnCfgClose">✓ Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// Restore settings from localStorage (with defaults)
+(function restoreSettings() {
+  const s = JSON.parse(localStorage.getItem('scrollingSettings') || '{}');
+  document.getElementById('cfgTrig').value  = s.trig  ?? 65;
+  document.getElementById('cfgSpeed').value = s.speed ?? 50;
+  document.getElementById('cfgLand').value  = s.land  ?? 15;
+  document.getElementById('cfgApiKey').value= s.apiKey|| 'AIzaSyC0joHpg4SbPd_cE-9XUtyVAFe0MGpraVk';
+  if (!localStorage.getItem('geminiKey')) {
+    localStorage.setItem('geminiKey', s.apiKey || 'AIzaSyC0joHpg4SbPd_cE-9XUtyVAFe0MGpraVk');
+  }
+})();
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── DOM ──
+const viewWrap   = document.getElementById('viewWrap');
+const canvas     = document.getElementById('pdfCanvas');
+const ctx        = canvas.getContext('2d');
+const rollBar    = document.getElementById('rollBar');
+const progBar    = document.getElementById('progBar');
+const drop       = document.getElementById('drop');
+const loader     = document.getElementById('loader');
+const loaderMsg  = document.getElementById('loaderMsg');
+const pgLbl      = document.getElementById('pgLbl');
+const bpmVal     = document.getElementById('bpmVal');
+const bpmRange   = document.getElementById('bpmRange');
+const btnPlay    = document.getElementById('btnPlay');
+const btnStop    = document.getElementById('btnStop');
+const btnAna     = document.getElementById('btnAna');
+const btnMan     = document.getElementById('btnMan');
+const btnSave    = document.getElementById('btnSave');
+const btnCfg     = document.getElementById('btnCfg');
+const orderRow   = document.getElementById('orderRow');
+const orderInput = document.getElementById('orderInput');
+const btnMarkSec = document.getElementById('btnMarkSec');
+const btnMarkEnd = document.getElementById('btnMarkEnd');
+const seqTxt     = document.getElementById('seqTxt');
+const nowTxt     = document.getElementById('nowTxt');
+const btnNext    = document.getElementById('btnNext');
+const settingsOv = document.getElementById('settingsOverlay');
+const cfgTrig    = document.getElementById('cfgTrig');
+const cfgSpeed   = document.getElementById('cfgSpeed');
+const cfgLand    = document.getElementById('cfgLand');
+
+// ── Settings accessors ──
+const getTrig  = () => (parseInt(cfgTrig.value)  || 65) / 100;
+const getSpeed = () =>  parseInt(cfgSpeed.value) || 10;
+const getLand  = () => (parseInt(cfgLand.value)  || 15) / 100;  // fraction from top
+
+// ── Settings popup ──
+btnCfg.addEventListener('click', () => {
+  // Populate all fields from localStorage
+  const s = JSON.parse(localStorage.getItem('scrollingSettings') || '{}');
+  document.getElementById('cfgTrig').value   = s.trig  ?? 65;
+  document.getElementById('cfgSpeed').value  = s.speed ?? 50;
+  document.getElementById('cfgLand').value   = s.land  ?? 15;
+  document.getElementById('cfgApiKey').value = s.apiKey || localStorage.getItem('geminiKey') || 'AIzaSyC0joHpg4SbPd_cE-9XUtyVAFe0MGpraVk';
+  settingsOv.classList.add('open');
+});
+document.getElementById('btnCfgClose').addEventListener('click', () => {
+  const k = document.getElementById('cfgApiKey').value.trim();
+  const settings = {
+    trig:   parseInt(document.getElementById('cfgTrig').value)  || 65,
+    speed:  parseInt(document.getElementById('cfgSpeed').value) || 50,
+    land:   parseInt(document.getElementById('cfgLand').value)  || 15,
+    apiKey: k || 'AIzaSyC0joHpg4SbPd_cE-9XUtyVAFe0MGpraVk'
+  };
+  localStorage.setItem('scrollingSettings', JSON.stringify(settings));
+  if (k) localStorage.setItem('geminiKey', k);
+  settingsOv.classList.remove('open');
+});
+settingsOv.addEventListener('click', e => { if (e.target === settingsOv) settingsOv.classList.remove('open'); });
+
+// ── PDF state ──
+let pdfDoc      = null;
+let scale       = 1;
+let totalPages  = 0;
+let pageHeights = [];
+let pageTops    = [];
+let totalDocH   = 0;
+let pageCanvases= [];
+let pageCrops   = [];
+let pageOffsets = [];
+
+// ── Scroll ──
+let docScrollY   = 0;
+let scrollTarget = 0;
+let scrolling    = false;
+
+// ── Section data ──
+let sections   = [];
+let endMarkers = [];
+let playOrder  = [];
+
+// ── Playback ──
+let playing   = false;
+let animId    = null;
+let lastTs    = null;
+let bpm       = 60;
+let barDocY   = 0;
+let aiIdx     = 0;
+let aiSegEndY = 0;
+
+// ── Helpers ──
+const pps    = () => bpm * 0.3;
+const vH     = () => viewWrap.clientHeight;
+const vW     = () => viewWrap.clientWidth;
+const maxSc  = () => Math.max(0, totalDocH - vH());
+const d2s    = y  => y - docScrollY;
+const labelOf= i  => String.fromCharCode(65 + i);
+
+function setLoading(show, msg) {
+  loader.style.display = show ? 'flex' : 'none';
+  if (msg) loaderMsg.textContent = msg;
+}
+
+// ── Render ──
+function renderViewport() {
+  const W = vW(), H = vH();
+  if (canvas.width !== W || canvas.height !== H) {
+    canvas.width = W; canvas.height = H;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  }
+  ctx.fillStyle = '#f2f2ed'; ctx.fillRect(0, 0, W, H);
+  const vT = docScrollY, vB = vT + H;
+  for (let i = 0; i < totalPages; i++) {
+    const pt = pageTops[i], pb = pt + pageHeights[i];
+    if (pb < vT || pt > vB) continue;
+    ctx.drawImage(pageCanvases[i], 0, Math.round(pt - vT));
+  }
+  const ms = maxSc();
+  progBar.style.width = ms > 0 ? (docScrollY / ms * 100) + '%' : '0%';
+  let pg = 0;
+  for (let i = 0; i < pageTops.length; i++) { if (pageTops[i] <= docScrollY + H/2) pg = i; }
+  pgLbl.textContent = `${pg+1} / ${totalPages}`;
+  document.querySelectorAll('.sec-marker, .end-marker').forEach(el => {
+    const dy = parseFloat(el.dataset.docY);
+    el.style.top = Math.round(dy - docScrollY) + 'px';
+    el.style.display = (dy >= docScrollY - 40 && dy <= docScrollY + H + 40) ? 'block' : 'none';
+  });
+}
+
+// ── Plain linear smooth scroll ──
+function smoothScrollTo(target) {
+  scrollTarget = Math.max(0, Math.min(target, maxSc()));
+  if (!scrolling) { scrolling = true; runScroll(); }
+}
+function runScroll() {
+  const diff = scrollTarget - docScrollY;
+  if (Math.abs(diff) < 0.5) { docScrollY = scrollTarget; scrolling = false; renderViewport(); return; }
+  docScrollY += Math.sign(diff) * Math.min(Math.abs(diff), getSpeed());
+  renderViewport();
+  requestAnimationFrame(runScroll);
+}
+
+// ── Draggable marker helper ──
+function makeDraggable(el, getData, setData, onDrop) {
+  let dragging = false, startY = 0, startDocY = 0;
+  function onDown(e) {
+    e.preventDefault(); dragging = true;
+    startY = e.touches ? e.touches[0].clientY : e.clientY;
+    startDocY = getData();
+    el.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onUp);
+  }
+  function onMove(e) {
+    if (!dragging) return; e.preventDefault();
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    const nd = Math.max(0, Math.min(totalDocH, startDocY + cy - startY));
+    setData(nd); el.dataset.docY = nd;
+    el.style.top = Math.round(nd - docScrollY) + 'px';
+  }
+  function onUp() {
+    if (!dragging) return; dragging = false;
+    el.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+    if (onDrop) onDrop();
+  }
+  el.addEventListener('mousedown', onDown);
+  el.addEventListener('touchstart', onDown, { passive: false });
+}
+
+function makeSecMarker(sec) {
+  const el = document.createElement('div'); el.className = 'sec-marker';
+  el.dataset.docY = sec.docY; el.style.top = Math.round(sec.docY - docScrollY) + 'px';
+  const line = document.createElement('div'); line.className = 'sec-line'; el.appendChild(line);
+  const hint = document.createElement('div'); hint.className = 'sec-drag-hint'; hint.textContent = '↕ drag to reposition'; el.appendChild(hint);
+  const dot = document.createElement('div'); dot.className = 'sec-dot'; dot.id = 'dot-' + sec.label; dot.textContent = sec.label;
+  dot.addEventListener('click', () => smoothScrollTo(Math.max(0, sec.docY - 30)));
+  el.appendChild(dot);
+  makeDraggable(el, () => sec.docY, nd => { sec.docY = nd; }, () => {
+    sections.sort((a, b) => a.docY - b.docY);
+    sections.forEach((s, i) => { s.label = labelOf(i); });
+    rebuildAllMarkers();
+  });
+  viewWrap.appendChild(el);
+}
+
+function makeEndMarker(em) {
+  const el = document.createElement('div'); el.className = 'end-marker';
+  el.dataset.docY = em.docY; el.style.top = Math.round(em.docY - docScrollY) + 'px';
+  const line = document.createElement('div'); line.className = 'end-line'; el.appendChild(line);
+  const hint = document.createElement('div'); hint.className = 'end-drag-hint'; hint.textContent = '↕ drag · right-click to delete'; el.appendChild(hint);
+  const dot = document.createElement('div'); dot.className = 'end-dot'; dot.textContent = 'END'; el.appendChild(dot);
+  el.addEventListener('contextmenu', e => { e.preventDefault(); endMarkers.splice(endMarkers.indexOf(em), 1); el.remove(); });
+  makeDraggable(el, () => em.docY, nd => { em.docY = nd; });
+  viewWrap.appendChild(el);
+}
+
+function rebuildAllMarkers() {
+  document.querySelectorAll('.sec-marker, .end-marker').forEach(e => e.remove());
+  sections.forEach(s => makeSecMarker(s));
+  endMarkers.forEach(e => makeEndMarker(e));
+  renderViewport();
+}
+
+function getSectionEndY(label) {
+  const sec = sections.find(s => s.label === label); if (!sec) return totalDocH;
+  const si = sections.findIndex(s => s.label === label);
+  const nextSecY = si + 1 < sections.length ? sections[si + 1].docY : totalDocH;
+  const em = endMarkers.filter(e => e.docY > sec.docY && e.docY <= nextSecY).sort((a, b) => a.docY - b.docY)[0];
+  return em ? em.docY : nextSecY;
+}
+
+// ── Sequence text ──
+function buildSeqText() {
+  seqTxt.innerHTML = '';
+  if (!playOrder.length) return;
+  playOrder.forEach((l, i) => {
+    const sp = document.createElement('span'); sp.id = 'sq' + i; sp.textContent = l; sp.className = 'sq-rest';
+    seqTxt.appendChild(sp);
+    if (i < playOrder.length - 1) {
+      const ar = document.createElement('span'); ar.className = 'sq-arrow'; ar.textContent = '→';
+      seqTxt.appendChild(ar);
+    }
+  });
+}
+
+function updateSeqText(idx) {
+  playOrder.forEach((_, i) => {
+    const el = document.getElementById('sq' + i); if (!el) return;
+    el.className = i < idx ? 'sq-done' : i === idx ? 'sq-now' : i === idx+1 ? 'sq-nxt' : 'sq-rest';
+  });
+  const nowL  = idx >= 0 ? playOrder[idx]     : '';
+  const nextL = idx >= 0 ? playOrder[idx + 1] : '';
+  // Larger "now playing" display
+  if (nowL) {
+    nowTxt.textContent = '▶ ' + nowL + (nextL ? '  →  ' + nextL : '  (last)');
+  } else {
+    nowTxt.textContent = '';
+  }
+  document.querySelectorAll('.sec-dot').forEach(el => el.classList.remove('active'));
+  const d = document.getElementById('dot-' + nowL); if (d) d.classList.add('active');
+  // Show/hide floating next button
+  btnNext.classList.toggle('visible', playing && playOrder.length > 0);
+}
+
+// ── Next section (floating button + spacebar) ──
+function goNextSection() {
+  if (!playing || !playOrder.length) return;
+  aiIdx++;
+  if (aiIdx >= playOrder.length) { stopPlayback(); return; }
+  jumpToSeg(aiIdx, () => { lastTs = null; animId = requestAnimationFrame(tick); });
+}
+
+btnNext.addEventListener('click', goNextSection);
+btnNext.addEventListener('touchend', e => { e.preventDefault(); goNextSection(); });
+
+// ── Playback ──
+function stopPlayback() {
+  playing = false;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  rollBar.style.display = 'none';
+  btnPlay.textContent = '▶ Play'; btnPlay.className = 'btn play';
+  nowTxt.textContent = '';
+  document.querySelectorAll('.sec-dot').forEach(el => el.classList.remove('active'));
+  btnNext.classList.remove('visible');
+}
+
+function fullStop() {
+  stopPlayback(); barDocY = 0; docScrollY = 0; scrollTarget = 0; scrolling = false;
+  renderViewport(); updateSeqText(-1);
+}
+
+function startPlayback() {
+  if (!pdfDoc) return;
+  playing = true; lastTs = null;
+  btnPlay.textContent = '⏸ Pause'; btnPlay.className = 'btn pause';
+  rollBar.style.display = 'block';
+  if (playOrder.length > 0) {
+    aiIdx = 0;
+    jumpToSeg(0, () => { lastTs = null; animId = requestAnimationFrame(tick); });
+  } else {
+    barDocY = docScrollY; animId = requestAnimationFrame(tick);
+  }
+}
+
+function jumpToSeg(idx, cb) {
+  aiIdx = idx;
+  const lbl = playOrder[idx];
+  const sec = sections.find(s => s.label === lbl);
+  if (!sec) { if (cb) cb(); return; }
+  aiSegEndY = getSectionEndY(lbl);
+  barDocY   = sec.docY;
+  updateSeqText(idx);
+  const target = Math.max(0, sec.docY - 20);
+  smoothScrollTo(target);
+  const dist = Math.abs(target - docScrollY);
+  const waitMs = Math.min(1400, Math.max(200, (dist / getSpeed()) * (1000 / 60)));
+  setTimeout(() => { if (playing && cb) cb(); }, waitMs + 80);
+}
+
+function tick(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.1); lastTs = ts;
+  barDocY += pps() * dt;
+
+  if (playOrder.length > 0) {
+    if (barDocY >= aiSegEndY) {
+      aiIdx++;
+      if (aiIdx >= playOrder.length) { stopPlayback(); return; }
+      jumpToSeg(aiIdx, () => { lastTs = null; animId = requestAnimationFrame(tick); });
+      return;
+    }
+  } else {
+    if (barDocY >= totalDocH) { stopPlayback(); return; }
+  }
+
+  // Auto-scroll: bar hits trigger threshold AND section end is not yet visible
+  const barScr     = d2s(barDocY);
+  const segEndScr  = d2s(aiSegEndY);
+  const segEndVis  = segEndScr >= 0 && segEndScr <= vH();
+
+  if (barScr > vH() * getTrig() && !scrolling && !segEndVis) {
+    // Scroll so bar lands at getLand() from top (preserving chords above staff)
+    smoothScrollTo(barDocY - vH() * getLand());
+  }
+
+  const bs = d2s(barDocY);
+  rollBar.style.top = Math.max(0, bs) + 'px';
+  rollBar.style.display = (bs >= 0 && bs <= vH()) ? 'block' : 'none';
+  renderViewport();
+  animId = requestAnimationFrame(tick);
+}
+
+btnPlay.addEventListener('click', () => { playing ? stopPlayback() : startPlayback(); });
+btnStop.addEventListener('click', fullStop);
+
+// ── BPM ──
+function setBpm(v) { bpm = Math.max(10, Math.min(200, v)); bpmVal.value = bpm; bpmRange.value = bpm; }
+bpmVal.addEventListener('change', () => setBpm(parseInt(bpmVal.value) || 60));
+bpmVal.addEventListener('keydown', e => { if (e.key === 'Enter') bpmVal.blur(); });
+bpmRange.addEventListener('input', () => setBpm(parseInt(bpmRange.value)));
+document.getElementById('btnM5').addEventListener('click', () => setBpm(bpm - 5));
+document.getElementById('btnP5').addEventListener('click', () => setBpm(bpm + 5));
+
+// ── Manual mode ──
+btnMan.addEventListener('click', () => {
+  const open = orderRow.classList.toggle('visible');
+  btnMan.classList.toggle('active', open);
+  if (open) orderInput.value = playOrder.join(', ');
+});
+
+btnMarkSec.addEventListener('click', () => {
+  const docY = docScrollY + vH() * 0.38;
+  sections.push({ label: labelOf(sections.length), docY });
+  sections.sort((a, b) => a.docY - b.docY);
+  sections.forEach((s, i) => { s.label = labelOf(i); });
+  rebuildAllMarkers();
+  if (!orderInput.value.trim()) orderInput.value = sections.map(s => s.label).join(', ');
+});
+
+btnMarkEnd.addEventListener('click', () => {
+  const em = { docY: docScrollY + vH() * 0.62 };
+  endMarkers.push(em); makeEndMarker(em);
+});
+
+document.getElementById('btnOrderOk').addEventListener('click', () => {
+  const raw = orderInput.value.split(/[\s,]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+  if (raw.length && raw.some(l => !sections.find(s => s.label === l))) {
+    alert('Play order contains labels not in your section list.\nDefined: ' + sections.map(s => s.label).join(', ')); return;
+  }
+  playOrder = raw; buildSeqText();
+  orderRow.classList.remove('visible'); btnMan.classList.remove('active');
+});
+
+document.getElementById('btnOrderCancel').addEventListener('click', () => {
+  orderRow.classList.remove('visible'); btnMan.classList.remove('active');
+});
+
+// ── Gemini Analysis ──
+btnAna.addEventListener('click', async () => {
+  if (!pdfDoc) return;
+  const apiKey = localStorage.getItem('geminiKey') || 'AIzaSyC0joHpg4SbPd_cE-9XUtyVAFe0MGpraVk';
+  if (!apiKey) { alert('Please set your Gemini API key in Settings (⚙).'); return; }
+  btnAna.disabled = true;
+  setLoading(true, 'Sending to Gemini AI…\nAnalyzing sections & repeats.\n(10–30 sec)');
+  try {
+    const parts = [];
+    for (let i = 0; i < totalPages; i++) {
+      const pg = await pdfDoc.getPage(i + 1);
+      const vp = pg.getViewport({ scale });
+      const W = Math.floor(vp.width), H = Math.floor(vp.height);
+      const tmp = document.createElement('canvas'); tmp.width = W; tmp.height = H;
+      const tc = tmp.getContext('2d'); tc.fillStyle = '#fff'; tc.fillRect(0, 0, W, H);
+      await pg.render({ canvasContext: tc, viewport: vp }).promise;
+      parts.push({ text: `PAGE ${i+1} of ${totalPages} — full image height=${H}px width=${W}px` });
+      parts.push({ inline_data: { mime_type: 'image/jpeg', data: tmp.toDataURL('image/jpeg', .88).split(',')[1] } });
+    }
+    parts.push({ text: `You are an expert music engraver.
+TASK 1 — Find rehearsal section markers: letters (A,B,C…) inside a rectangular BOX on the score. Not chord symbols.
+For each: label, page (1-based), yOnPage (Y pixel of box TOP EDGE from row 0 of full page image including blank margin).
+TASK 2 — Full play order with ALL repeats (repeat barlines, volta 1./2. endings, D.C., D.S.).
+Return ONLY valid JSON:
+{"sections":[{"label":"A","page":1,"yOnPage":145},{"label":"B","page":1,"yOnPage":720}],
+"playOrder":["A","A","B","B","A","C","C"],"notes":"Brief description."}
+If no boxed markers: sections:[], playOrder:[]. JSON only, no markdown.` });
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts }] }) });
+    if (!resp.ok) throw new Error('Gemini API error ' + resp.status + ': ' + await resp.text());
+    const data = await resp.json();
+    const raw  = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log('[Gemini raw]', raw);
+    const j = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    sections = (j.sections || []).map(s => {
+      const pi = Math.max(0, (s.page || 1) - 1);
+      const off = pageOffsets[pi] || 0, crop = pageCrops[pi]?.t || 0;
+      const docY = off + Math.max(0, (s.yOnPage || 0) - crop);
+      console.log(`  [${s.label}] yOnPage=${s.yOnPage} off=${off} crop=${crop} => docY=${docY}`);
+      return { label: s.label, docY };
+    });
+    playOrder = (j.playOrder || []).filter(l => l !== 'full');
+    rebuildAllMarkers(); buildSeqText();
+    setLoading(false);
+    alert('✦ Analysis complete\nSections: ' + sections.map(s=>s.label).join(', ') +
+      '\nPlay order: ' + playOrder.join(' → ') + (j.notes ? '\n\n📝 '+j.notes : '') +
+      '\n\nDrag the section lines to fine-tune position.\nPress Play when ready.');
+  } catch(e) { setLoading(false); alert('Analysis failed:\n' + e.message); console.error(e); }
+  finally { btnAna.disabled = false; }
+});
+
+// ── Save PDF ──
+btnSave.addEventListener('click', async () => {
+  if (!pdfDoc || !window.PDFLib) return;
+  btnSave.disabled = true; btnSave.textContent = '💾 Saving…';
+  try {
+    const savedSettings = JSON.parse(localStorage.getItem('scrollingSettings') || '{}');
+    const meta = { v:1, sections:sections.map(s=>({label:s.label,docY:Math.round(s.docY)})),
+      endMarkers:endMarkers.map(e=>({docY:Math.round(e.docY)})), playOrder,
+      pageOffsets:pageOffsets.map(Math.round), pageCrops:pageCrops.map(c=>({t:c.t,b:c.b})),
+      scale, totalDocH:Math.round(totalDocH),
+      tempo: bpm,
+      settings: { trig: savedSettings.trig??65, speed: savedSettings.speed??50, land: savedSettings.land??15 },
+      savedAt:new Date().toISOString() };
+    const pdfBytes = await pdfDoc.getData();
+    const pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
+    pdfLibDoc.setKeywords([JSON.stringify(meta)]);
+    pdfLibDoc.setSubject('ScrollingApp-v1');
+    const saved = await pdfLibDoc.save();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([saved], { type: 'application/pdf' }));
+    a.download = (loadPDF._origName || 'score') + '-scroll.pdf'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    alert('✦ Saved!\n\nSection markers and play order are embedded in the PDF.\nRe-opening it in Scrolling will restore everything automatically.');
+  } catch(e) { alert('Save failed: ' + e.message); console.error(e); }
+  finally { btnSave.disabled = false; btnSave.textContent = '💾 Save PDF'; }
+});
+
+// ── Load PDF ──
+async function loadPDF(file) {
+  // Store original filename for Save
+  loadPDF._origName = file.name.replace(/\.pdf$/i, '');
+  stopPlayback();
+  sections = []; endMarkers = []; playOrder = [];
+  pageCanvases = []; pageCrops = []; pageOffsets = []; pageHeights = []; pageTops = [];
+  document.querySelectorAll('.sec-marker, .end-marker').forEach(e => e.remove());
+  seqTxt.innerHTML = ''; nowTxt.textContent = '';
+  docScrollY = 0; barDocY = 0; scrollTarget = 0; scrolling = false;
+  rollBar.style.display = 'none';
+  drop.classList.remove('gone');
+  [btnPlay,btnStop,btnAna,btnMan,btnSave].forEach(b => b.disabled = true);
+  setLoading(true, 'Rendering pages…');
+  try {
+    pdfDoc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    totalPages = pdfDoc.numPages;
+    const fp = await pdfDoc.getPage(1);
+    scale = vW() / fp.getViewport({ scale: 1 }).width;
+
+    function cropPage(cv) {
+      const W=cv.width,H=cv.height,d=cv.getContext('2d').getImageData(0,0,W,H).data;
+      const blank=r=>{const b=r*W*4;for(let x=0;x<W;x++){const i=b+x*4;if(d[i+3]<10)continue;if(d[i]<248||d[i+1]<248||d[i+2]<248)return false;}return true;};
+      let t=0,b=H-1;while(t<H&&blank(t))t++;while(b>t&&blank(b))b--;
+      return{t,b};
+    }
+    function measureGap(cv,t,b) {
+      const W=cv.width,H=b-t;if(H<=0)return null;
+      const d=cv.getContext('2d').getImageData(0,t,W,H).data;
+      const blank=r=>{const b=r*W*4;for(let x=0;x<W;x++){const i=b+x*4;if(d[i+3]<10)continue;if(d[i]<248||d[i+1]<248||d[i+2]<248)return false;}return true;};
+      const skip=Math.floor(H*.05);let inG=false,gs=0;const gaps=[];
+      for(let r=skip;r<H-skip;r++){if(!inG&&blank(r)){inG=true;gs=r;}else if(inG&&!blank(r)){gaps.push(r-gs);inG=false;}}
+      const real=gaps.filter(g=>g>4).sort((a,b)=>a-b);
+      return real.length?real[Math.floor(real.length/2)]:null;
+    }
+
+    const rawCrops=[],rawCv=[];
+    for(let i=1;i<=totalPages;i++){
+      const pg=await pdfDoc.getPage(i),vp=pg.getViewport({scale});
+      const W=Math.floor(vp.width),H=Math.floor(vp.height);
+      const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+      const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);
+      await pg.render({canvasContext:c,viewport:vp}).promise;
+      const crop=cropPage(cv);rawCrops.push(crop);rawCv.push(cv);pageCrops.push(crop);
+    }
+    const c0=rawCrops[0];
+    const GAP=measureGap(rawCv[0],c0.t,c0.b)??Math.max(14,Math.min(...rawCrops.map(c=>c.t)));
+    console.log('[PDF] GAP=',GAP);
+
+    let cumY=0;
+    for(let i=0;i<totalPages;i++){
+      const{t,b}=rawCrops[i],cH=b-t+1,PW=rawCv[i].width;
+      const rc=document.createElement('canvas');
+      rc.width=PW;rc.height=GAP+cH+(i===totalPages-1?GAP:0);
+      const rcc=rc.getContext('2d');rcc.fillStyle='#f2f2ed';rcc.fillRect(0,0,rc.width,rc.height);
+      rcc.drawImage(rawCv[i],0,t,PW,cH,0,GAP,PW,cH);
+      pageOffsets.push(cumY+GAP);pageTops.push(cumY);pageHeights.push(rc.height);
+      pageCanvases.push(rc);cumY+=rc.height;
+    }
+    totalDocH=cumY;
+    renderViewport();
+    drop.classList.add('gone');
+    [btnPlay,btnStop,btnAna,btnMan,btnSave].forEach(b => b.disabled = false);
+
+    // Auto-restore metadata
+    try {
+      const info=await pdfDoc.getMetadata();
+      const kw=info?.info?.Keywords||'';
+      if(kw.startsWith('{')&&kw.includes('"sections"')){
+        const meta=JSON.parse(kw);
+        if(meta.sections?.length){
+          sections=meta.sections; endMarkers=meta.endMarkers||[]; playOrder=meta.playOrder||[];
+          // Restore tempo
+          if (meta.tempo) setBpm(meta.tempo);
+          // Restore settings
+          if (meta.settings) {
+            const cur = JSON.parse(localStorage.getItem('scrollingSettings')||'{}');
+            const merged = Object.assign(cur, meta.settings);
+            localStorage.setItem('scrollingSettings', JSON.stringify(merged));
+            document.getElementById('cfgTrig').value  = merged.trig  ?? 65;
+            document.getElementById('cfgSpeed').value = merged.speed ?? 50;
+            document.getElementById('cfgLand').value  = merged.land  ?? 15;
+          }
+          rebuildAllMarkers(); buildSeqText();
+          alert('✦ Metadata restored!\nSections: '+sections.map(s=>s.label).join(', ')+
+            '\nPlay order: '+(playOrder.join(' → ')||'(none)')+
+            (meta.tempo?'\nTempo: '+meta.tempo+' BPM':''));
+        }
+      }
+    }catch(_){}
+  }catch(e){alert('Error loading PDF: '+e.message);console.error(e);}
+  finally{setLoading(false);}
+}
+
+// ── File / drag-drop ──
+document.getElementById('fileIn').addEventListener('change', e => {
+  if(e.target.files[0])loadPDF(e.target.files[0]);e.target.value='';
+});
+viewWrap.addEventListener('dragover', e => e.preventDefault());
+viewWrap.addEventListener('drop', e => {
+  e.preventDefault();const f=e.dataTransfer.files[0];
+  if(f?.type==='application/pdf')loadPDF(f);
+});
+
+// ── Wheel scroll ──
+viewWrap.addEventListener('wheel', e => {
+  if(playing)return;
+  smoothScrollTo(docScrollY+e.deltaY*1.1);
+},{passive:true});
+
+// ── Resize ──
+window.addEventListener('resize',()=>{if(pdfDoc)renderViewport();});
+
+// ── Keyboard ──
+document.addEventListener('keydown', e => {
+  if(e.target.tagName==='INPUT')return;
+  if(e.code==='Space'){
+    e.preventDefault();
+    // Space = next section while playing with play order, else toggle play
+    if(playing&&playOrder.length>0) goNextSection();
+    else playing?stopPlayback():startPlayback();
+  }
+  if(e.code==='ArrowLeft') setBpm(bpm-5);
+  if(e.code==='ArrowRight')setBpm(bpm+5);
+  if(e.code==='ArrowUp'){e.preventDefault();if(!playing)smoothScrollTo(docScrollY-100);}
+  if(e.code==='ArrowDown'){e.preventDefault();if(!playing)smoothScrollTo(docScrollY+100);}
+  if(e.key.length===1&&/[a-zA-Z]/.test(e.key)&&!e.ctrlKey&&!e.metaKey){
+    const s=sections.find(x=>x.label===e.key.toUpperCase());
+    if(s)smoothScrollTo(Math.max(0,s.docY-30));
+  }
+});
+</script>
+</body>
+</html>
