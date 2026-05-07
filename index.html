@@ -822,11 +822,47 @@ viewWrap.addEventListener('drop', e => {
   if(f?.type==='application/pdf')loadPDF(f);
 });
 
-// ── Wheel scroll ──
+// ── Wheel scroll (mouse/trackpad) ──
 viewWrap.addEventListener('wheel', e => {
-  if(playing)return;
-  smoothScrollTo(docScrollY+e.deltaY*1.1);
-},{passive:true});
+  if (playing) return;
+  smoothScrollTo(docScrollY + e.deltaY * 1.1);
+}, { passive: true });
+
+// ── Touch scroll (iPad / touchscreen) ──
+let touchStartY = 0;
+let touchLastY  = 0;
+let touchActive = false;
+
+viewWrap.addEventListener('touchstart', e => {
+  // Ignore if touch is on a marker (they handle their own drag)
+  if (e.target.closest('.sec-marker, .end-marker')) return;
+  touchStartY = e.touches[0].clientY;
+  touchLastY  = touchStartY;
+  touchActive = true;
+}, { passive: true });
+
+viewWrap.addEventListener('touchmove', e => {
+  if (!touchActive) return;
+  // Ignore if touch is on a marker
+  if (e.target.closest('.sec-marker, .end-marker')) return;
+  const y    = e.touches[0].clientY;
+  const diff = touchLastY - y;   // positive = scrolling down
+  touchLastY = y;
+  // Direct scroll (no animation) for instant feel
+  docScrollY = Math.max(0, Math.min(docScrollY + diff, maxSc()));
+  scrollTarget = docScrollY;
+  renderViewport();
+}, { passive: true });
+
+viewWrap.addEventListener('touchend', e => {
+  if (!touchActive) return;
+  touchActive = false;
+  // Apply a small momentum flick based on last delta
+  const totalDelta = touchStartY - touchLastY;
+  if (Math.abs(totalDelta) > 5) {
+    smoothScrollTo(docScrollY + totalDelta * 0.3);
+  }
+}, { passive: true });
 
 // ── Resize ──
 window.addEventListener('resize',()=>{if(pdfDoc)renderViewport();});
